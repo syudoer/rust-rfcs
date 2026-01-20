@@ -106,6 +106,11 @@ The `MethodCallExpr` grammar is extended in two specific ways:
         *   If `Ident` matches a `pub use Trait as Alias;` statement, the call resolves to `<Type as Trait>::method`.
         *   The keyword `Self` is implicitly treated as an alias for the inherent implementation. `obj.Self::method()` resolves to the inherent method.
 
+3.  **Inherent Impl Items**:
+    *   A `use Trait as Alias;` item is now valid within an inherent `impl` block.
+    *   `use Trait;` is also supported as a shorthand for `use Trait as Trait;`.
+    *   Visibility modifiers (e.g., `pub`) are supported and determine the visibility of the alias for method resolution.
+
 ### Resolution Logic Summary
 
 *   **Case: `obj.(Trait::method)(...)`**
