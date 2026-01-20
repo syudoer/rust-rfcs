@@ -14,7 +14,7 @@ This RFC proposes two extensions to Rust's method call syntax to unify method re
 ## Motivation
 [motivation]: #motivation
 
-Currently, Rust's "Fully Qualified Syntax" (UFCS), e.g., `Trait::method(&obj)`, is the only mechanism to resolve method name conflicts between inherent implementations and traits, or between multiple traits.
+Currently, Rust's "Fully Qualified Syntax" (UFCS), e.g., `Trait::method(&obj)`, is the main mechanism to resolve method name conflicts between inherent implementations and traits, or between multiple traits.
 
 While robust, UFCS forces a reversal of the visual data flow, breaking the fluent interface pattern:
 *   **Fluent (Ideal)**: `object.process().output()`
