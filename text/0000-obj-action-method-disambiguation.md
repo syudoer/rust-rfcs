@@ -135,8 +135,8 @@ The `MethodCallExpr` grammar is extended in two specific ways:
     *   The primary benefit is for the **consumer**. They should not need to know the origin module of a trait to use it. Aliasing bundles the dependency with the type, treating the trait as a named interface/facet of the object.
     *   It mirrors C++ explicit qualification (e.g., `obj.Base::method()`).
 *   **Why Parentheses for Ad-hoc?**
-    *   `obj.Trait::method` is syntactically ambiguous with field access.
-    *   `obj.(Trait::method)` is unambiguous and visually distinct.
+    *   `obj.Trait::method` looks like there is something called `Trait` inside the `obj` while `Trait` is coming from the scope of the call
+    *   `obj.(Trait::method)` shows that `Trait::method` is evaluated first and then applied to the obj
 
 ## Prior art
 [prior-art]: #prior-art
