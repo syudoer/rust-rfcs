@@ -124,7 +124,7 @@ The `MethodCallExpr` grammar is extended in two specific ways:
 ## Drawbacks
 [drawbacks]: #drawbacks
 
-*   **Cognitive Load** Increasing the cognitive load of users and Rust developers by adding more features
+*   **Cognitive Load** Increasing the cognitive load of users and Rust developers by adding more features. The definition-site aliases may eventually become a common way to group methods forcing users to deal with this feature not only in the case of method name disambiguation 
 *   **Parser Complexity**: The parser requires lookahead or distinct rules to distinguish `.` followed by `(` (method call) versus `.` followed by `Ident` followed by `::` (aliased call).
 *   **Punctuation Noise**: The syntax `.(...)` introduces more "Perl-like" punctuation symbols to the language, which some may find unaesthetic.
 
