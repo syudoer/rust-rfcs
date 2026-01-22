@@ -8,83 +8,159 @@
 
 This RFC proposes two extensions to Rust's method call syntax to unify method resolution and maintain fluent method chaining ("noun-verb" style) in the presence of naming ambiguities:
 
-1.  **Ad-hoc Disambiguation**: `expr.(Trait::method)(args)` allows invoking a specific trait method inline without breaking the method chain.
-2.  **Definition-site Aliases**: `pub use Trait as Alias;` within `impl` blocks enables `expr.Alias::method(args)`, allowing type authors to expose traits as named "facets" of their API.
+1.  **Trait Method Call**: `expr.(path::to::Trait::method)(args)` allows invoking a specific trait's method inline without breaking the method chain. (The parentheses around `path::to::Trait::method` are required)
+2.  **inherent Method Call**: `expr.Self::method(args)` is an explicit way to call an inherent method. (Unlike the previous case parentheses are not allowed)
 
 ## Motivation
 [motivation]: #motivation
 
-Currently, Rust's "Fully Qualified Syntax" (UFCS), e.g., `Trait::method(&obj)`, is the main mechanism to resolve method name conflicts between inherent implementations and traits, or between multiple traits.
+Currently, Rust's "Fully Qualified Syntax" (UFCS), e.g., `Trait::method(&obj)`, is the main mechanism to disambiguate method calls between inherent implementations and traits, or between multiple traits.
 
 While robust, UFCS forces a reversal of the visual data flow, breaking the fluent interface pattern:
 *   **Fluent (Ideal)**: `object.process().output()`
 *   **Broken (Current)**: `Trait::output(&object.process())`
 
-This creates significant friction:
-1.  **Cognitive Load**: The user must stop writing logic, look up the full trait path, import it, and restructure the code to wrap the object in a function call.
-2.  **API Opacity**: Consumers often do not know which specific module a trait comes from, nor should they need to manage those imports just to call a method.
-
-We propose a solution that restores the `object.action()` left-to-right flow in all cases and provides tools for both API consumers (ad-hoc fixes) and API producers (aliases).
-
 ## Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-### The Problem: Ambiguous Methods
+There are three ways to have something callable inside of `obj`:
+- as a field containing a pointer to a function
+- as an inherent method
+- as a trait method 
 
-Imagine you are using a type `Image` that has an optimized inherent `rotate` method. Later, you import a graphics library with a `Transform` trait that also defines `rotate`.
+While the first one is not confusing and has its unique syntax `(value.field)(args)`, the other two may cause some unexpected completely unrelated errors.
 
+Imagine you have this piece of code 
 ```rust
-struct Image;
-impl Image {
-    fn rotate(&self) { println!("Optimized internal rotation"); }
+use std::fmt::Display;
+
+struct SomeThing<T> {
+    something: fn(T),
 }
 
-use graphic_lib::Transform;
-impl Transform for Image {
-    fn rotate(&self) { println!("Generic geometric rotation"); }
-    fn crop(&self) { ... }
+impl<T: Copy + Display> SomeThing<T> {
+    fn something(&self, _arg: T) {
+        println!("inherent fn called, got {}", _arg)
+    }
 }
-```
 
-Calling `img.rotate()` is now ambiguous or defaults to the inherent method when you might intend to use the trait implementation.
+trait SomeTrait<T: Copy + Display> {
+    fn something(&self, _arg: T);
+}
 
-### Solution 1: Ad-hoc Disambiguation (The "Quick Fix")
+impl<T: Copy + Display> SomeTrait<T> for SomeThing<T> {
+    fn something(&self, _arg: T) {
+        println!("trait fn called, got {}", _arg);
 
-If you are a consumer of this API and need to resolve this ambiguity immediately without breaking your method chain, you can use parentheses to specify the trait:
+        print!("\t");
+        self.something(_arg);
+    }
+}
 
-```rust
-// Calls the Trait implementation while maintaining the chain
-img.crop().(Transform::rotate)().save();
-```
+fn main() {
+    let value = SomeThing { something: |_arg: i32| {println!("fn pointer called, got {_arg}")} };
 
-This tells the compiler: "Use the `rotate` method from the `Transform` trait on this object."
-
-**Note on `Self`**: While `img.(Self::rotate)()` is grammatically possible in some cases, it is discouraged. The compiler will warn you to remove the parentheses and use the explicit alias syntax described below.
-
-### Solution 2: Definition-site Aliases (The "API Design" Fix)
-
-As the author of `Image`, you can prevent this friction for your users. Instead of forcing them to import `graphic_lib::Transform` to access specific functionality, you can expose that trait as a named part of your `Image` API.
-
-```rust
-impl Image {
-    // Inherent method
-    fn rotate(&self) { ... }
-
-    // Expose the Transform trait as 'OtherOps' (Operations)
-    pub use graphic_lib::Transform as OtherOps;
+    value.something(1);
+    (value.something)(2);
+    SomeTrait::something(&value, 3);
 }
 ```
 
-Now, users can access these methods via the alias, which is conceptually part of the `Image` type:
-
-```rust
-let img = Image::new();
-
-img.Self::rotate();     // Explicitly calls inherent (Optimized)
-img.OtherOps::rotate(); // Calls via Alias -> Transform (Generic)
+it works, it handles all three ways and prints
+```plain
+inherent fn called, got 1
+fn pointer called, got 2
+trait fn called, got 3
+    inherent fn called, got 3
 ```
 
-The `Self` keyword is implicitly treated as an alias for the inherent implementation, ensuring symmetry.
+but if you change the line `impl<T: Copy + Display> SomeTrait<T> for SomeThing<T> {` to `impl<T: Copy + Display, U: Copy> SomeTrait<T> for SomeThing<U> {` instead of producing an error for the mismatch, the code compiles successfully and prints 
+
+```plain
+inherent fn called, got 1
+fn pointer called, got 2
+trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    trait fn called, got 3
+    ...
+```
+
+You would also get the same undesirable behavior in another case. You could rename `something` in `SomeThing`'s impl block and forget to rename it in the `SomeTrait`'s impl block
+```rust
+impl<T: Copy + Display> SomeTrait<T> for SomeThing<T> {
+    fn something(&self, _arg: T) {
+        println!("trait fn called, got {}", _arg);
+
+        print!("\t");
+        self.something(_arg); // here
+    }
+}
+```
+
+To prevent this and ensure the compiler rejects broken code, it would be better to use `self.Self::something(_arg)` instead of `self.something(_arg)`.
+
+```rust
+impl<T: Copy + Display> SomeTrait<T> for SomeThing<T> {
+    fn something(&self, _arg: T) {
+        println!("trait fn called, got {}", _arg);
+
+        print!("\t");
+        self.Self::something(_arg);
+    }
+}
+```
+
+`value.Self::method()` allows the compiler to only use an inherent method called `method` and errors if it hasn't been found.
+
+### Method Chain Conflicts
+
+Sometimes the ambiguity arises not within an implementation, but when using a type that implements traits with overlapping method names.
+
+Consider a scenario where you have a `Builder` struct that implements both a `Reset` trait and has an inherent `reset` method.
+
+```rust
+struct Builder;
+impl Builder {
+    fn build(&self) -> String { "done".to_string() }
+    fn reset(&self) -> &Self { self }
+}
+
+trait Reset {
+    fn reset(&self) -> &Self;
+}
+
+impl Reset for Builder {
+    fn reset(&self) -> &Self { self }
+}
+
+fn main() {
+    let b = Builder;
+    // Defaults to the inherent method `reset` but silently falls back to the trait implementation if the inherent method is removed or renamed
+    b.reset().build(); 
+}
+```
+
+Using the new syntax, you can explicitly choose which method to use without breaking the chain:
+
+```rust
+fn main() {
+    let b = Builder;
+
+    // Use the inherent reset method
+    b.Self::reset().build();
+
+    // Use the trait's reset method explicitly
+    b.(Reset::reset)().build();
+}
+```
 
 ## Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
@@ -94,22 +170,15 @@ The `Self` keyword is implicitly treated as an alias for the inherent implementa
 The `MethodCallExpr` grammar is extended in two specific ways:
 
 1.  **Parenthesized Path**: `Expr '.' '(' TypePath ')' '(' Args ')'`
-    *   This syntax is used for **Ad-hoc Disambiguation**.
+    *   This syntax is used for **Explicit Trait Method Calls**.
     *   **Resolution**: The `TypePath` is resolved. If it resolves to a trait method, it is invoked with `Expr` as the receiver (the first argument).
     *   **Desugaring**: `obj.(Path::method)(args)` desugars to `Path::method(obj, args)`, ensuring correct autoref/autoderef behavior for `obj`.
     *   **Restriction**: Using `(Self::method)` inside an `impl` block where `Self` is a type alias triggers a compiler warning, suggesting the removal of parentheses and usage of `Expr.Self::method()`.
 
-2.  **Aliased Path**: `Expr '.' Ident '::' Ident '(' Args ')'`
-    *   This syntax is used for **Definition-site Aliases**.
-    *   **Resolution**: The first `Ident` is looked up in the `impl` block of the `Expr`'s type.
-    *   **Alias Matching**:
-        *   If `Ident` matches a `pub use Trait as Alias;` statement, the call resolves to `<Type as Trait>::method`.
-        *   The keyword `Self` is implicitly treated as an alias for the inherent implementation. `obj.Self::method()` resolves to the inherent method.
-
-3.  **Inherent Impl Items**:
-    *   A `use Trait as Alias;` item is now valid within an inherent `impl` block.
-    *   `use Trait;` is also supported as a shorthand for `use Trait as Trait;`.
-    *   Visibility modifiers (e.g., `pub`) are supported and determine the visibility of the alias for method resolution.
+2.  **Explicit Inherent Path**: `Expr '.' 'Self' '::' Ident '(' Args ')'`
+    *   This syntax is used for **Explicit Inherent Method Calls**.
+    *   **Resolution**: The `Ident` is looked up strictly within the inherent implementation of `Expr`'s type.
+    *   **Semantics**: `obj.Self::method()` resolves to the inherent method `method`. It effectively bypasses trait method lookup.
 
 ### Resolution Logic Summary
 
@@ -117,31 +186,30 @@ The `MethodCallExpr` grammar is extended in two specific ways:
     *   Compiler verifies `Trait` is in scope or fully qualified.
     *   Resolves to UFCS call with `obj` as first arg.
 
-*   **Case: `obj.Alias::method(...)`**
-    *   Compiler looks up `Alias` in `obj`'s type definition.
-    *   If found, maps to corresponding Trait implementation.
+*   **Case: `obj.Self::method(...)`**
+    *   Compiler looks up `method` in `obj`'s inherent implementation.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
 
-*   **Cognitive Load** Increasing the cognitive load of users and Rust developers by adding more features. The definition-site aliases may eventually become a common way to group methods forcing users to deal with this feature not only in the case of method name disambiguation 
-*   **Parser Complexity**: The parser requires lookahead or distinct rules to distinguish `.` followed by `(` (method call) versus `.` followed by `Ident` followed by `::` (aliased call).
+*   **Parser Complexity**: The parser requires lookahead or distinct rules to distinguish `.` followed by `(` (method call) versus `.` followed by `Self` followed by `::`.
 *   **Punctuation Noise**: The syntax `.(...)` introduces more "Perl-like" punctuation symbols to the language, which some may find unaesthetic.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-*   **Why Aliases?**
-    *   The primary benefit is for the **consumer**. They should not need to know the origin module of a trait to use it. Aliasing bundles the dependency with the type, treating the trait as a named interface/facet of the object.
-    *   It mirrors C++ explicit qualification (e.g., `obj.Base::method()`).
-*   **Why Parentheses for Ad-hoc?**
-    *   `obj.Trait::method` looks like there is something called `Trait` inside the `obj` while `Trait` is coming from the scope of the call
-    *   `obj.(Trait::method)` shows that `Trait::method` is evaluated first and then applied to the obj
+*   **Why Parentheses for Trait Method Calls?**
+    *   `value.Trait::method` looks like there is something called `Trait` inside the `value` while `Trait` is coming from the scope of the call.
+    *   `value.(Trait::method)` shows that `Trait::method` is evaluated first and then applied to the `value`.
+    *   **Reservation**: We specifically reserve the unparenthesized syntax `value.Category::method()` (where `Category` is not `Self`) for possible future language features, such as "Categorical" or "Facet" views of an object. Using parentheses for ad-hoc trait paths avoids closing the door on this design space.
+*   **Why No Parentheses for Inherent Method Call?**
+    *   Unlike `Trait`, which comes from the outer scope, `Self` conceptually belongs to the instance itself.
+    *   `value.Self::method()` aligns with the mental model that `Self` is intrinsic to `value`, acting as a specific "facet" of the object itself, rather than an external function applied to it. This justifies the lack of parentheses, matching the reserved `value.Category::method()` syntax.
 
 ## Prior art
 [prior-art]: #prior-art
 
-*   **C++**: Allows explicit qualification of method calls using `obj.Base::method()`, which served as inspiration for the Aliased Path syntax.
+*   **C++**: Allows explicit qualification of method calls using `obj.Base::method()`.
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
@@ -152,3 +220,4 @@ The `MethodCallExpr` grammar is extended in two specific ways:
 [future-possibilities]: #future-possibilities
 
 *   **Scoped Prioritization**: We can also introduce syntax like `use Trait for Foo` or `use Self for Foo` within a function scope to change default resolution without changing call sites.
+*   **Disabling Inherent Preference**: A specialized macro or attribute could be introduced to opt-out of the default "inherent-first" resolution rule (effectively canceling the implicit `use Self for *`). This aligns with Rust's philosophy of explicit over implicit behavior where ambiguity exists, ensuring that code correctness is verifiable.
