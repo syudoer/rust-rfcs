@@ -9,7 +9,7 @@
 This RFC proposes two extensions to Rust's method call syntax to unify method resolution and maintain fluent method chaining ("noun-verb" style) in the presence of naming ambiguities:
 
 1.  **Trait Method Call**: `expr.(path::to::Trait::method)(args)` allows invoking a specific trait's method inline without breaking the method chain. (The parentheses around `path::to::Trait::method` are required)
-2.  **inherent Method Call**: `expr.Self::method(args)` is an explicit way to call an inherent method. (Unlike the previous case parentheses are not allowed)
+2.  **Inherent Method Call**: `expr.Self::method(args)` is an explicit way to call an inherent method. (Unlike the previous case parentheses are not allowed)
 
 ## Motivation
 [motivation]: #motivation
@@ -23,12 +23,12 @@ While robust, UFCS forces a reversal of the visual data flow, breaking the fluen
 ## Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-There are three ways to have something callable inside of `obj`:
+There are three ways to have something callable on `obj`:
 - as a field containing a pointer to a function
 - as an inherent method
 - as a trait method 
 
-While the first one is not confusing and has its unique syntax `(value.field)(args)`, the other two may cause some unexpected completely unrelated errors.
+While the first one is not confusing and has its unique syntax `(value.field)(args)`, the other two may cause some unexpected and completely unrelated errors.
 
 Imagine you have this piece of code 
 ```rust
