@@ -28,7 +28,7 @@ There are three ways to have something callable on `obj`:
 - as an inherent method
 - as a trait method 
 
-While the first one is not confusing and has its unique syntax `(value.field)(args)`, the other two may cause some unexpected and completely unrelated errors.
+While the first one is not confusing and has its unique syntax `(value.field)(args)`, the other two may cause some unexpected errors that seem unrelated to the actual mistake.
 
 Imagine you have this piece of code 
 ```rust
