@@ -58,7 +58,7 @@ impl<T: Copy + Display> SomeTrait<T> for SomeThing<T> {
 }
 
 fn main() {
-    let value = SomeThing { something: |_arg: i32| {println!("fn pointer called, got {_arg}")} };
+    let value = SomeThing { something: |_arg: i32| {println!("fn pointer called, got {}", _arg)} };
 
     value.something(1);
     (value.something)(2);
