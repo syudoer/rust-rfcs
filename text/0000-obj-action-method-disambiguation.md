@@ -142,7 +142,7 @@ impl Reset for Builder {
 }
 
 fn main() {
-    let b = Builder;
+    let b = Builder {};
     // Defaults to the inherent method `reset` but silently falls back to the trait implementation if the inherent method is removed or renamed
     b.reset().build(); 
 }
