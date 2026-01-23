@@ -230,7 +230,7 @@ The `MethodCallExpr` grammar is extended in two specific ways:
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-*   **Syntax Choice**: Should we consider other bracket types to avoid confusion with tuple grouping? (e.g., `obj.{Trait::method}()` or `obj.[Trait::method]()`)?
+*   **Syntax Choice**: Should we consider other bracket types to avoid confusion with tuple grouping? (e.g., `obj.<Trait::method>()` or `obj.[Trait::method]()` or)?
 
 ## Future possibilities
 [future-possibilities]: #future-possibilities
