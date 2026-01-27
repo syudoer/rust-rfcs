@@ -1,6 +1,6 @@
 - Feature Name: `natural-method-disambiguation`
 - Start Date: 2026-01-27
-- RFC PR: [rust-lang/rfcs#0000](https://github.com/rust-lang/rfcs/pull/0000)
+- RFC PR: [rust-lang/rfcs#3913](https://github.com/rust-lang/rfcs/pull/3913)
 - Rust Issue: [rust-lang/rust#0000](https://github.com/rust-lang/rust/issues/0000)
 
 ## Summary
