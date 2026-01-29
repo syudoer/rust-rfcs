@@ -261,3 +261,4 @@ The `MethodCallExpr` grammar is extended in two specific ways:
 
 *   **Scoped Prioritization**: We can also introduce syntax like `use Trait for Foo` or `use Self for Foo` within a function scope to change default resolution without changing call sites.
 *   **Disabling Inherent Preference**: A specialized macro or attribute could be introduced to opt-out of the default "inherent-first" resolution rule.
+*   **Warning on Signature Collision**: Since identical signatures (matching positional argument types) are rare, we could warn on such overlaps. This would flag fragile call sites and detect when a newly added inherent method silently hijacks existing trait-based invocations.
