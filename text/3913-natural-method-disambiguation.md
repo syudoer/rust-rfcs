@@ -249,7 +249,38 @@ The `MethodCallExpr` grammar is extended in two specific ways:
 ## Prior art
 [prior-art]: #prior-art
 
-*   **C++**: Allows explicit qualification of method calls using `obj.Base::method()`.
+## Prior art
+
+Several programming languages face similar challenges with method disambiguation when inherent implementations conflict with trait-/interface-/extension-provided methods. Approaches generally fall into three categories: explicit qualification syntax, cast-based selection, or strict implicit resolution (sometimes with anti-features).
+
+- **C++**  
+  C++ supports direct qualification with the scope resolution operator: `obj.Base::method()` or `obj.Trait::method()`.  
+  This is the closest analogue to the proposed `obj.Self::method()` (for inherent methods) and `obj.<Trait>::method()` (for trait methods).  
+  It preserves chaining ergonomics and readability, which is a key inspiration for this RFC.
+
+- **C#**  
+  When a type explicitly implements interface members or when multiple interfaces provide the same method, disambiguation is typically achieved via explicit casts: `((IInterface)obj).Method()`.  
+  Extension methods (somewhat analogous to blanket impls over traits) are resolved statically and can be called explicitly via the static class if needed, but there is no dedicated qualification syntax for instance calls.  
+  Cast-based approaches interrupt method chaining and reduce readability compared to qualification.
+
+- **Java**  
+  Similar to C#, external disambiguation requires casts: `((Interface)obj).method()`.  
+  Inside a class implementing multiple interfaces with default methods, one can use qualified super calls: `Interface.super.method()`.  
+  Again, external calls rely on casts, which do not chain naturally.
+
+- **Kotlin**  
+  Within a class, qualified super calls are supported: `super<Interface>.method()`.  
+  For external calls on an object, disambiguation uses casts: `(obj as Interface).method()`.  
+  The internal syntax is close to the proposal, but external calls suffer the same chaining issues as cast-based approaches.
+
+- **Swift** (anti-example)  
+  Swift deliberately prohibits any form of type qualification or annotation on method calls to keep the grammar simple.  
+  This can lead to ambiguities in generic code that require workarounds, such as passing explicit type information through parameters or using separate overloads.  
+  This demonstrates the pitfalls of making disambiguation impossible when it is occasionally needed.
+
+Many other languages (e.g., Haskell, Go) rely entirely on implicit resolution via type-class/instance selection or interface satisfaction, with coherence rules preventing most ambiguities. When ambiguities do arise, they are usually treated as errors requiring code restructuring rather than providing a syntactic escape hatch.
+
+The current Rust approach (`<Type as Trait>::method(&mut obj)` and `Trait::method(&mut obj)`) works but is verbose and it breaks natural chaining. This proposal builds on C++-style qualification while adapting it to Rust’s orphan and coherence rules, offering explicit control without sacrificing ergonomics.
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
